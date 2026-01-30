@@ -6,233 +6,118 @@
   <title>Biorecensions-analys (Sentiment)</title>
   <meta name="description" content="Webbapp som analyserar om en biorecension är positiv eller negativ med en TF.js-modell." />
 
-  <!-- Lätt, ren styling -->
   <style>
     :root {
-      --bg: #0b1220;
-      --card: #111a2b;
-      --accent: #3b82f6;
-      --accent-2: #14b8a6;
-      --text: #e5e7eb;
-      --muted: #93a1b1;
-      --bad: #ef4444;
-      --good: #22c55e;
-      --warning: #f59e0b;
+      --bg: #0b1220; --card: #111a2b; --accent: #3b82f6; --accent-2: #14b8a6;
+      --text: #e5e7eb; --muted: #93a1b1; --bad: #ef4444; --good: #22c55e;
       --border: #1f2a44;
       --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     }
+    html, body { background:#0b1220; color:var(--text); margin:0; font-family:var(--font); }
+    .wrap { max-width: 1080px; margin: 3rem auto; padding: 0 1rem; }
+    header h1 { margin:0 0 .4rem; font-size: clamp(1.6rem, 1rem + 2vw, 2.2rem); }
+    header p { margin:.2rem 0 0; color:var(--muted); }
 
-    html, body {
-      background: radial-gradient(1200px 600px at 10% 10%, #0e1628 0%, #0b1220 40%, #090f1a 100%);
-      color: var(--text);
-      margin: 0;
-      font-family: var(--font);
-      line-height: 1.45;
-      min-height: 100%;
-    }
-
-    .wrap {
-      max-width: 940px;
-      margin: 4rem auto;
-      padding: 0 1rem;
-    }
-
-    header h1 {
-      font-weight: 800;
-      font-size: clamp(1.6rem, 1.2rem + 2vw, 2.4rem);
-      margin: 0 0 0.4rem 0;
-      letter-spacing: .2px;
-    }
-    header p {
-      margin-top: 0;
-      color: var(--muted);
-    }
+    .grid { display:grid; gap:1rem; grid-template-columns: 1fr; }
+    @media (min-width: 1000px) { .grid { grid-template-columns: 1.1fr .9fr; } }
 
     .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-      padding: 1.25rem;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
+      border:1px solid var(--border); border-radius:16px; padding:1rem;
     }
-
-    .row {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-
-    @media (min-width: 920px) {
-      .row {
-        grid-template-columns: 1.2fr .8fr;
-      }
-    }
-
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: .5rem;
-    }
-
+    label { font-weight:600; display:block; margin-bottom:.5rem; }
     textarea {
-      width: 100%;
-      min-height: 180px;
-      resize: vertical;
-      background: #0e172a;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 0.9rem 1rem;
-      font-size: 1rem;
+      width:100%; min-height:180px; resize:vertical; background:#0e172a; color:var(--text);
+      border:1px solid var(--border); border-radius:12px; padding:.9rem 1rem; font-size:1rem;
     }
-
-    .controls {
-      display: flex;
-      gap: .75rem;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-top: .75rem;
-    }
-
+    .controls { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; margin-top:.75rem; }
     button {
-      appearance: none;
-      border: 0;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      color: white;
-      padding: .8rem 1.1rem;
-      border-radius: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 6px 18px rgba(20, 184, 166, 0.25);
-      transition: transform .05s ease;
+      appearance:none; border:0; background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      color:#fff; padding:.8rem 1.1rem; border-radius:12px; font-weight:700; cursor:pointer;
     }
-    button:hover { transform: translateY(-1px); }
-    button:disabled {
-      opacity: .6;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .status { color:var(--muted); }
 
-    .status {
-      font-size: .95rem;
-      color: var(--muted);
-    }
+    .pill { display:inline-flex; gap:.5rem; align-items:center; padding:.4rem .7rem; border-radius:999px; font-weight:800; }
+    .pill.pos { background:linear-gradient(90deg,#16a34a,#22c55e); }
+    .pill.neg { background:linear-gradient(90deg,#ef4444,#f87171); }
 
-    .out {
-      background: #0d1526;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem;
-    }
+    .out { background:#0d1526; border:1px solid var(--border); border-radius:12px; padding:1rem; }
+    .bar { height:12px; border-radius:999px; background:#0b1220; border:1px solid var(--border); overflow:hidden; }
+    .bar>span { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transition:width .2s ease; }
 
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      font-weight: 800;
-      padding: .45rem .75rem;
-      border-radius: 999px;
-      color: white;
+    /* Debug-panel */
+    .debug {
+      background:#0a1324; border:1px solid var(--border); border-radius:12px; padding:.75rem; height:260px; overflow:auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:.9rem; white-space:pre-wrap;
     }
-    .pill.pos { background: linear-gradient(90deg, #16a34a, #22c55e); }
-    .pill.neg { background: linear-gradient(90deg, #ef4444, #f87171); }
-
-    .bar {
-      height: 12px;
-      border-radius: 999px;
-      background: #0b1220;
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-    .bar > span {
-      display: block;
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      transition: width .2s ease;
-    }
-
-    footer {
-      margin-top: 2rem;
-      color: var(--muted);
-      font-size: .92rem;
-    }
-    code.kbd {
-      background: #0e172a;
-      border: 1px solid var(--border);
-      padding: .05rem .35rem;
-      border-radius: 6px;
-    }
+    .debug-actions { display:flex; gap:.5rem; margin:.5rem 0 .2rem; }
+    .badge { display:inline-block; padding:.1rem .4rem; border-radius:6px; background:#0e172a; border:1px solid var(--border); color:#cbd5e1; }
+    .kv { color:#cbd5e1; }
+    .kv .k { color:#93c5fd; }
+    .kv .v { color:#fbbf24; }
+    footer { margin-top:1rem; color:var(--muted); font-size:.92rem; }
+    code.kbd { background:#0e172a; border:1px solid var(--border); padding:.05rem .35rem; border-radius:6px; }
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <header>
       <h1>Analys av biorecension – Positiv eller negativ?</h1>
-      <p>Skriv in en recension nedan och klicka <strong>Analysera</strong>. Modellen körs helt i webbläsaren med TensorFlow.js.</p>
+      <p>Skriv en recension och klicka <strong>Analysera</strong>. Modellen körs i webbläsaren (TensorFlow.js).</p>
     </header>
 
-    <div class="row">
+    <div class="grid">
+      <!-- Vänster: inmatning -->
       <section class="card">
         <label for="inputText">Din recension</label>
-        <textarea id="inputText" placeholder="Exempel: Filmen var fantastisk! Skådespeleriet var toppklass och jag vill se den igen."></textarea>
-
+        <textarea id="inputText" placeholder="Exempel: Filmen var fantastisk! Jag vill se den igen."></textarea>
         <div class="controls">
           <button id="analyzeBtn" disabled>Analysera</button>
           <button id="clearBtn">Rensa</button>
-          <span class="status" id="status">Laddar modell…</span>
+          <span class="status" id="status">Laddar…</span>
         </div>
       </section>
 
+      <!-- Höger: resultat + debug -->
       <aside class="card">
-        <h3 style="margin-top:0;">Resultat</h3>
+        <h3 style="margin:.2rem 0 .6rem;">Resultat</h3>
         <div class="out">
           <div id="label" class="pill" style="display:none;"></div>
-          <div style="margin:.75rem 0 .25rem; color:#cbd5e1; font-weight:600;">Sannolikhet (positiv)</div>
+          <div style="margin:.6rem 0 .25rem;">Sannolikhet (positiv)</div>
           <div class="bar"><span id="probBar"></span></div>
-          <div style="margin-top:.5rem; color:#cbd5e1;">
-            <span id="probText">–</span>
-          </div>
-
-          <div style="margin-top:1rem; color:#93a1b1; font-size:.9rem;">
-            Tröskel: <code class="kbd" id="thresholdText">0.50</code>
-          </div>
+          <div style="margin-top:.4rem;"><span id="probText">–</span></div>
+          <div style="margin-top:.4rem; color:#93a1b1; font-size:.9rem;">Tröskel: <code class="kbd" id="thresholdText">0.50</code></div>
         </div>
+
+        <h3 style="margin:1rem 0 .5rem;">Debug</h3>
+        <div class="debug-actions">
+          <span class="badge" id="envBadge">–</span>
+          <button id="copyLogBtn">Kopiera logg</button>
+          <button id="clearLogBtn">Rensa logg</button>
+        </div>
+        <div id="debug" class="debug" aria-live="polite"></div>
       </aside>
     </div>
 
     <footer>
-      <p><strong>Tips:</strong> Aktivera GitHub Pages för detta repo (t.ex. branch <em>main</em> och mapp <em>/</em> eller <em>/docs</em>). Lägg denna fil och modellfilerna i samma mapp så att vägarna stämmer.</p>
+      <p><strong>Tips:</strong> Om du använder <code class="kbd">/docs</code> för GitHub Pages, lägg <em>alla</em> filer i samma mapp <code class="kbd">/docs</code> och låt <code class="kbd">BASE_PATH</code> vara tom sträng (“”).</p>
     </footer>
   </div>
 
-  <!-- TensorFlow.js via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"
-          integrity="sha384-+Q0n0l2n5h1gVZq5J9b5B3l4yK0mM/3M9jN7kP6cQ4k4wq+7hL6vQJ0kQ8YH2I6u"
-          crossorigin="anonymous"></script>
+  <!-- ✅ Rätt TF.js-laddning -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 
   <script>
     // === Konfiguration ===
-    // Om filerna ligger i samma mapp som index.html, låt dessa vara "" (tomma).
-    // Annars sätt en relativ sökväg, t.ex. "./models/".
-    const BASE_PATH = ""; // t.ex. "models/" om du har /models/model.json
+    // Om filerna ligger i samma mapp som index.html → lämna "".
+    // Om filerna ligger i /models → sätt "models/".
+    const BASE_PATH = ""; // t.ex. "models/"
     const MODEL_URL = BASE_PATH + "model.json";
     const METADATA_URL = BASE_PATH + "metadata.json";
-
-    // Tröskel för positiv/negativ (ändra vid behov)
     const THRESHOLD = 0.5;
 
-    // === Globala referenser ===
-    let model = null;
-    let metadata = null;
-    let wordIndex = {};
-    let maxLen = 100; // fallback om metadata inte har max_len
-    let lowercase = true;
-    let oovToken = "<OOV>";
-    let vocabSize = null; // används bara om du vill klippa index över viss gräns
-
+    // === UI refs ===
     const $status = document.getElementById("status");
     const $btn = document.getElementById("analyzeBtn");
     const $clear = document.getElementById("clearBtn");
@@ -241,122 +126,184 @@
     const $probBar = document.getElementById("probBar");
     const $probText = document.getElementById("probText");
     const $thresholdText = document.getElementById("thresholdText");
+    const $debug = document.getElementById("debug");
+    const $envBadge = document.getElementById("envBadge");
+    const $copyLogBtn = document.getElementById("copyLogBtn");
+    const $clearLogBtn = document.getElementById("clearLogBtn");
     $thresholdText.textContent = THRESHOLD.toFixed(2);
 
-    // === Hjälpfunktioner för text ===
+    // === Debug logger ===
+    let debugBuffer = [];
+    function ts() {
+      const d = new Date();
+      return d.toISOString().split("T")[1].replace("Z",""); // HH:MM:SS.mmm
+    }
+    function log(...args) {
+      const msg = args.map(a => {
+        try { return (typeof a === 'string') ? a : JSON.stringify(a, null, 2); }
+        catch { return String(a); }
+      }).join(" ");
+      const line = `[${ts()}] ${msg}`;
+      debugBuffer.push(line);
+      $debug.textContent += ( $debug.textContent ? "\n" : "" ) + line;
+      $debug.scrollTop = $debug.scrollHeight;
+      console.log("[DEBUG]", ...args);
+    }
+    $copyLogBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(debugBuffer.join("\n"));
+      log("📋 Kopierade loggen till urklipp.");
+    });
+    $clearLogBtn.addEventListener("click", () => {
+      debugBuffer = [];
+      $debug.textContent = "";
+      log("🧹 Rensade debuglogg.");
+    });
+
+    // === Modellmetadata ===
+    let model = null, metadata = null;
+    let wordIndex = {};
+    let maxLen = 100;
+    let lowercase = true;
+    let oovToken = "<OOV>";
+    let vocabSize = null;
+
+    function setStatus(msg) {
+      $status.textContent = msg;
+      log("STATUS:", msg);
+    }
+
     function simpleNormalize(s) {
-      let t = s;
-      if (lowercase) t = t.toLowerCase();
-      // Byt ut icke-bokstäver/siffror mot mellanslag, dela ord enkelt:
+      let t = lowercase ? s.toLowerCase() : s;
       t = t.normalize('NFKC').replace(/[^a-zåäöA-ZÅÄÖ0-9]+/g, ' ').trim();
       return t;
     }
-
     function tokenize(text) {
-      // Om metadata beskriver ett tokeniseringsschema – matcha det.
-      // Här använder vi enkel blankstegs-tokenisering som bas.
       const norm = simpleNormalize(text);
       if (!norm) return [];
       return norm.split(/\s+/);
     }
-
     function vectorize(text) {
-      // Konvertera ord → index enligt metadata.word_index
       const tokens = tokenize(text);
       const seq = [];
-      const oovIndex = wordIndex[oovToken] || wordIndex["<oov>"] || wordIndex["<unk>"] || 1;
+      const oovIndex = wordIndex[oovToken] ?? wordIndex["<oov>"] ?? wordIndex["<unk>"] ?? 1;
       for (const tok of tokens) {
         let idx = wordIndex[tok];
-        if (idx == null) idx = oovIndex != null ? oovIndex : 1; // 1 som sista fallback
-        if (vocabSize && idx >= vocabSize) idx = oovIndex || 1;
+        if (idx == null) idx = (oovIndex ?? 1);
+        if (vocabSize && idx >= vocabSize) idx = (oovIndex ?? 1);
         seq.push(idx);
       }
-      // Pad/trunkera till maxLen
       const padded = new Array(maxLen).fill(0);
-      // vanlig "pre" eller "post" padding – vi använder "pre"-padding här.
       const start = Math.max(0, maxLen - seq.length);
       for (let i = 0; i < Math.min(seq.length, maxLen); i++) {
         padded[start + i] = seq[seq.length - Math.min(seq.length, maxLen) + i];
       }
-      // Form: [1, maxLen]
       return tf.tensor2d([padded], [1, maxLen]);
-    }
-
-    function setStatus(msg) {
-      $status.textContent = msg;
     }
 
     function setOutput(prob) {
       const isPositive = prob >= THRESHOLD;
-      const percent = (prob * 100).toFixed(1) + " %";
       $label.style.display = "inline-flex";
       $label.textContent = isPositive ? "Positiv" : "Negativ";
       $label.className = "pill " + (isPositive ? "pos" : "neg");
       $probBar.style.width = Math.max(2, Math.round(prob * 100)) + "%";
-      $probText.textContent = percent;
+      $probText.textContent = (prob * 100).toFixed(1) + " %";
+      log("RESULT:", { probability_positive: prob, label: isPositive ? "Positiv" : "Negativ" });
+    }
+
+    async function headCheck(url) {
+      try {
+        const res = await fetch(url, { method: "HEAD", cache: "no-store" });
+        log("HEAD", url, "→", res.status, res.statusText, "| Content-Type:", res.headers.get("content-type"));
+        return res.ok;
+      } catch (e) {
+        log("HEAD ERROR", url, e && (e.message || e.toString()));
+        return false;
+      }
     }
 
     async function loadAll() {
-      try {
-        setStatus("Laddar modell…");
-        model = await tf.loadLayersModel(MODEL_URL);
-        setStatus("Laddar metadata…");
-        const res = await fetch(METADATA_URL);
-        metadata = await res.json();
+      $envBadge.textContent = location.hostname ? ("host: " + location.hostname) : "local file";
+      log("💡 Location:", window.location.href);
+      log("💡 BASE_PATH:", BASE_PATH);
+      log("💡 MODEL_URL:", MODEL_URL);
+      log("💡 METADATA_URL:", METADATA_URL);
 
-        // Läs ut vanliga fält från metadata
+      // Snabb kontroll av att filerna existerar
+      await headCheck(MODEL_URL);
+      await headCheck(METADATA_URL);
+
+      try {
+        setStatus("Laddar modell (TF.js)…");
+        log("TFJS version:", tf?.version?.tfjs);
+
+        // Ladda modellen
+        model = await tf.loadLayersModel(MODEL_URL, { fromTFHub: false });
+        log("✅ Modell laddad.");
+
+        // Ladda metadata
+        setStatus("Laddar metadata…");
+        const res = await fetch(METADATA_URL, { cache: "no-store" });
+        log("GET", METADATA_URL, "→", res.status, res.statusText, "| Content-Type:", res.headers.get("content-type"));
+        if (!res.ok) throw new Error(`Kunde inte hämta metadata.json (status ${res.status})`);
+        metadata = await res.json();
+        log("Metadata:", metadata);
+
         if (metadata.word_index) wordIndex = metadata.word_index;
         if (metadata.max_len) maxLen = metadata.max_len;
         if (metadata.lowercase !== undefined) lowercase = !!metadata.lowercase;
         if (metadata.oov_token) oovToken = metadata.oov_token;
         if (metadata.vocabulary_size) vocabSize = metadata.vocabulary_size;
 
-        // Varmkör för att initialisera (snabbare första inferens)
+        // Varmkör (init)
         tf.tidy(() => model.predict(tf.zeros([1, maxLen])));
 
         setStatus("Klar. Skriv en recension och klicka Analysera.");
         $btn.disabled = false;
       } catch (err) {
         console.error(err);
-        setStatus("Kunde inte ladda modell/metadata. Kontrollera filvägar och format.");
+        log("❌ LOAD ERROR:", err?.message || err.toString(), "\nSTACK:", err?.stack);
+        setStatus("Kunde inte ladda modell/metadata. Kontrollera filvägar och format (se Debug).");
       }
     }
 
     async function analyze() {
       const txt = $text.value.trim();
-      if (!txt) {
-        setStatus("Skriv något först 😊");
-        return;
-      }
+      if (!txt) { setStatus("Skriv något först 😊"); return; }
       $btn.disabled = true;
       setStatus("Analyserar…");
       try {
         const input = vectorize(txt);
+        log("Vectorized shape:", input.shape);
         const out = tf.tidy(() => model.predict(input));
-        // Antag 1-utgång (sigmoid). Om din modell ger [neg, pos], ta out.data()[1] istället.
         const data = await out.data();
+        log("Raw model output:", Array.from(data));
+
+        // Antag 1-utgång (sigmoid). Om din modell ger [neg, pos], byt till data[1].
         const probPositive = data.length === 1 ? data[0] : (data[1] ?? data[0]);
         setOutput(probPositive);
-        setStatus("Klart.");
+
         input.dispose();
         out.dispose();
+        setStatus("Klart.");
       } catch (err) {
         console.error(err);
-        setStatus("Fel vid inferens. Kolla konsolen (F12) för detaljer.");
+        log("❌ INFERENCE ERROR:", err?.message || err.toString(), "\nSTACK:", err?.stack);
+        setStatus("Fel vid inferens. Se Debug & Console.");
       } finally {
         $btn.disabled = false;
       }
     }
 
     // Event handlers
-    $btn.addEventListener("click", analyze);
-    $clear.addEventListener("click", () => {
+    document.getElementById("analyzeBtn").addEventListener("click", analyze);
+    document.getElementById("clearBtn").addEventListener("click", () => {
       $text.value = "";
       $label.style.display = "none";
       $probBar.style.width = "0%";
       $probText.textContent = "–";
       setStatus("Rensat. Skriv en ny recension.");
       $text.focus();
+      log("UI cleared.");
     });
 
     // Start
