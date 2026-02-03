@@ -1,262 +1,88 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="sv">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Biorecensions-analys (Sentiment)</title>
-  <style>
-    body{margin:0;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:1000px;margin:3rem auto;padding:0 1rem}
-    .grid{display:grid;gap:1rem;grid-template-columns:1fr}
-    @media(min-width:1000px){.grid{grid-template-columns:1.1fr .9fr}}
-    .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));border:1px solid #1f2a44;border-radius:16px;padding:1rem}
-    textarea{width:100%;min-height:180px;background:#0e172a;color:#e5e7eb;border:1px solid #1f2a44;border-radius:12px;padding:.9rem 1rem}
-    button{border:0;background:linear-gradient(90deg,#3b82f6,#14b8a6);color:#fff;padding:.8rem 1.1rem;border-radius:12px;font-weight:700;cursor:pointer}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    .pill{display:inline-flex;padding:.4rem .7rem;border-radius:999px;font-weight:800}
-    .pos{background:linear-gradient(90deg,#16a34a,#22c55e)} .neg{background:linear-gradient(90deg,#ef4444,#f87171)}
-    .bar{height:12px;border-radius:999px;background:#0b1220;border:1px solid #1f2a44;overflow:hidden}
-    .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#14b8a6);transition:width .2s}
-    .debug{background:#0a1324;border:1px solid #1f2a44;border-radius:12px;padding:.75rem;height:260px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem}
-  </style>
+    <meta charset="UTF-8">
+    <title>Sentimentanalys</title>
 </head>
+
 <body>
-  <div class="wrap">
-    <h1>Analys av biorecension – Positiv eller negativ?</h1>
-    <p>Skriv en recension, klicka <b>Analysera</b>. Allt körs i webbläsaren.</p>
+    <h2>Analys av text (positiv/negativ)</h2>
 
-    <div class="grid">
-      <section class="card">
-        <label for="inputText">Din recension</label>
-        <textarea id="inputText" placeholder="Exempel: Filmen var fantastisk!"></textarea>
-        <div style="display:flex;gap:.75rem;align-items:center;margin-top:.75rem">
-          <button id="analyzeBtn" disabled>Analysera</button>
-          <button id="clearBtn">Rensa</button>
-          <span id="status" style="color:#93a1b1">Laddar…</span>
-        </div>
-      </section>
+    <textarea id="inputText" rows="5" cols="50"
+              placeholder="Skriv recension här..."></textarea>
+    <br><br>
 
-      <aside class="card">
-        <h3>Resultat</h3>
-        <div style="background:#0d1526;border:1px solid #1f2a44;border-radius:12px;padding:1rem">
-          <div id="label" class="pill" style="display:none"></div>
-          <div style="margin:.6rem 0 .25rem">Sannolikhet (positiv)</div>
-          <div class="bar"><span id="probBar"></span></div>
-          <div style="margin-top:.4rem"><span id="probText">–</span></div>
-          <div style="margin-top:.4rem;color:#93a1b1;font-size:.9rem">Tröskel: <code id="thresholdText">0.50</code></div>
-        </div>
+    <button onclick="analyze()">Analysera</button>
 
-        <h3 style="margin-top:1rem">Debug</h3>
-        <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
-          <span id="envBadge" style="background:#0e172a;border:1px solid #1f2a44;border-radius:6px;padding:.1rem .4rem">–</span>
-          <button id="copyLogBtn">Kopiera logg</button>
-          <button id="clearLogBtn">Rensa logg</button>
-        </div>
-        <div id="debug" class="debug" aria-live="polite"></div>
-      </aside>
-    </div>
-  </div>
+    <h3>Resultat:</h3>
+    <div id="output">–</div>
 
-  <!-- ✅ RÄTT! TensorFlow.js laddas korrekt -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js" crossorigin="anonymous"></script>
+    <!-- 🔥 RÄTT TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 
-  <script>
-    // ===== Konfiguration (alla filer i samma mapp) =====
-    const VERSION = 'v1'; // öka vid behov för cache-bust
-    const BASE_PATH = "";
-    const MODEL_URL = BASE_PATH + "model.json?" + VERSION;
-    const METADATA_URL = BASE_PATH + "metadata.json?" + VERSION;
-    const THRESHOLD = 0.5;
+    <script>
+        let model;
+        let metadata;
+        let wordIndex = {};
+        let maxLen = 100;
+        let oov = 1;
 
-    // ===== UI refs =====
-    const $status = document.getElementById("status");
-    const $btn = document.getElementById("analyzeBtn");
-    const $clear = document.getElementById("clearBtn");
-    const $text = document.getElementById("inputText");
-    const $label = document.getElementById("label");
-    const $probBar = document.getElementById("probBar");
-    const $probText = document.getElementById("probText");
-    const $thresholdText = document.getElementById("thresholdText");
-    const $debug = document.getElementById("debug");
-    const $envBadge = document.getElementById("envBadge");
-    const $copyLogBtn = document.getElementById("copyLogBtn");
-    const $clearLogBtn = document.getElementById("clearLogBtn");
-    $thresholdText.textContent = THRESHOLD.toFixed(2);
+        // 🔥 Ladda modell + metadata
+        async function loadModel() {
+            try {
+                model = await tf.loadLayersModel("model.json");
+                metadata = await fetch("metadata.json").then(r => r.json());
 
-    // ===== Debug logger + globala fel fångare =====
-    let debugBuffer = [];
-    function ts(){ return new Date().toISOString().split('T')[1].replace('Z',''); }
-    function log(...args){
-      const line = `[${ts()}] ` + args.map(a => {
-        try{ return typeof a === 'string' ? a : JSON.stringify(a,null,2); }catch{ return String(a); }
-      }).join(' ');
-      debugBuffer.push(line);
-      $debug.textContent += ($debug.textContent ? "\n" : "") + line;
-      $debug.scrollTop = $debug.scrollHeight;
-      console.log("[DEBUG]", ...args);
-    }
-    window.addEventListener('error', e => log('WINDOW ERROR:', e.message, e.filename, e.lineno + ':' + e.colno));
-    window.addEventListener('unhandledrejection', e => log('UNHANDLED REJECTION:', e.reason?.message || String(e.reason)));
+                wordIndex = metadata.word_index;
+                maxLen = metadata.max_len;
+                oov = wordIndex[metadata.oov_token] || 1;
 
-    $copyLogBtn.onclick = async () => {
-      try{ await navigator.clipboard.writeText(debugBuffer.join("\n")); log("📋 Kopierade loggen."); }catch(e){ log("⚠️ Clipboard error:", e.message); }
-    };
-    $clearLogBtn.onclick = () => { debugBuffer = []; $debug.textContent = ""; log("🧹 Rensade debug."); };
-
-    function setStatus(msg){ $status.textContent = msg; log("STATUS:", msg); }
-
-    // ===== Text → vektor =====
-    let model=null, metadata=null, isGraph=false;
-    let wordIndex={}, maxLen=100, lowercase=true, oovToken="<OOV>", vocabSize=null;
-    const GRAPH_INPUT_NAME=null, GRAPH_OUTPUT_NAME=null; // fyll i om Graph kräver
-
-    function simpleNormalize(s){ let t = lowercase ? s.toLowerCase() : s; return t.normalize('NFKC').replace(/[^a-zåäöA-ZÅÄÖ0-9]+/g,' ').trim(); }
-    function tokenize(s){ const n=simpleNormalize(s); return n? n.split(/\s+/) : []; }
-    function vectorize(text){
-      const tokens = tokenize(text), seq=[];
-      const oov = wordIndex[oovToken] ?? wordIndex["<oov>"] ?? wordIndex["<unk>"] ?? 1;
-      for(const tok of tokens){ let idx = wordIndex[tok]; if(idx==null) idx = oov; if(vocabSize && idx>=vocabSize) idx = oov; seq.push(idx); }
-      const pad = new Array(maxLen).fill(0); const start = Math.max(0, maxLen - seq.length);
-      for(let i=0;i<Math.min(seq.length,maxLen);i++){ pad[start+i] = seq[seq.length - Math.min(seq.length,maxLen) + i]; }
-      return tf.tensor2d([pad],[1,maxLen]);
-    }
-    function setOutput(p){
-      const pos = p>=THRESHOLD;
-      $label.style.display = "inline-flex";
-      $label.textContent = pos ? "Positiv" : "Negativ";
-      $label.className = "pill " + (pos ? "pos" : "neg");
-      $probBar.style.width = Math.max(2, Math.round(p*100)) + "%";
-      $probText.textContent = (p*100).toFixed(1) + " %";
-      log("RESULT:", {probability_positive:p, label: pos?"Positiv":"Negativ"});
-    }
-
-    async function safeFetch(url, opts){
-      const r = await fetch(url, {cache:'no-store', ...opts});
-      log(opts?.method || 'GET', url, '→', r.status, r.statusText, '| CT:', r.headers.get('content-type'));
-      if(!r.ok) throw new Error(`HTTP ${r.status} on ${url}`);
-      return r;
-    }
-
-    async function detectModelFormat(){
-      const res = await safeFetch(MODEL_URL);
-      const j = await res.json();
-      if (j.format && String(j.format).toLowerCase().includes('graph')) { isGraph = true; log('🔎 GRAPH-modell (format:', j.format, ')'); }
-      else if (j.modelTopology) { isGraph = false; log('🔎 LAYERS-modell (modelTopology finns).'); }
-      else { isGraph = false; log('⚠️ Okänt; testar LAYERS först, fallback till GRAPH.'); }
-      if (j.weightsManifest) log('weightsManifest:', j.weightsManifest);
-      return j;
-    }
-
-    async function loadAll(){
-      $envBadge.textContent = location.hostname ? ('host: '+location.hostname) : 'local file';
-      log('Location:', location.href);
-
-      // 0) Finns TF.js?
-      if (typeof tf === 'undefined') {
-        setStatus('TF.js laddades inte – kontrollera script‑taggen/uppkopplingen.');
-        log('❌ tf är undefined. CDN kanske blockat/offline.');
-        return;
-      }
-      log('TFJS version:', tf?.version?.tfjs);
-
-      try{
-        // 1) Kolla att filerna finns
-        await fetch('model.json', {method:'HEAD'}).then(r=>log('HEAD model.json →', r.status, r.statusText));
-        await fetch('metadata.json', {method:'HEAD'}).then(r=>log('HEAD metadata.json →', r.status, r.statusText));
-
-        // 2) Upptäck modelltyp
-        setStatus('Läser model.json…');
-        await detectModelFormat();
-
-        // 3) Ladda metadata
-        setStatus('Laddar metadata…');
-        const meta = await safeFetch(METADATA_URL);
-        metadata = await meta.json();
-        if (metadata.word_index) wordIndex = metadata.word_index;
-        if (metadata.max_len) maxLen = metadata.max_len;
-        if (metadata.lowercase !== undefined) lowercase = !!metadata.lowercase;
-        if (metadata.oov_token) oovToken = metadata.oov_token;
-        if (metadata.vocabulary_size) vocabSize = metadata.vocabulary_size;
-        log('metadata:', metadata);
-
-        // 4) Lasta modell (med fallback)
-        setStatus('Laddar modell…');
-        try{
-          model = isGraph ? await tf.loadGraphModel(MODEL_URL) : await tf.loadLayersModel(MODEL_URL);
-          log('✅ Modell laddad som', isGraph ? 'GRAPH' : 'LAYERS');
-        }catch(e1){
-          log('❌ Första laddningen misslyckades:', e1.message);
-          // prova andra varianten
-          model = isGraph ? await tf.loadLayersModel(MODEL_URL) : await tf.loadGraphModel(MODEL_URL);
-          isGraph = !isGraph;
-          log('✅ Lyckades via fallback. isGraph =', isGraph);
+                document.getElementById("output").innerText = "Modell laddad.";
+            } catch (e) {
+                document.getElementById("output").innerText =
+                    "Kunde inte ladda modell/metadata.";
+                console.error(e);
+            }
         }
 
-        // 5) Warmup / I/O-namn vid Graph
-        if (!isGraph) {
-          tf.tidy(()=>model.predict(tf.zeros([1,maxLen])));
-        } else {
-          const ins = model?.executor?._inputs?.map(t=>t.name);
-          const outs = model?.executor?._outputs?.map(t=>t.name);
-          log('Graph inputs:', ins);
-          log('Graph outputs:', outs);
+        // 🔥 Tokenisering + padding
+        function textToTensor(text) {
+            text = text.toLowerCase().replace(/[^a-zåäö0-9]+/g, " ").trim();
+            const tokens = text.split(" ");
+
+            let seq = tokens.map(t =>
+                wordIndex[t] ? wordIndex[t] : oov
+            );
+
+            let padded = new Array(maxLen).fill(0);
+            let start = Math.max(0, maxLen - seq.length);
+
+            for (let i = 0; i < Math.min(seq.length, maxLen); i++) {
+                padded[start + i] = seq[seq.length - Math.min(seq.length, maxLen) + i];
+            }
+
+            return tf.tensor2d([padded]);
         }
 
-        setStatus('Klar. Skriv en recension och klicka Analysera.');
-        $btn.disabled = false;
+        // 🔥 Analys
+        async function analyze() {
+            const text = document.getElementById("inputText").value;
+            const input = textToTensor(text);
 
-      }catch(err){
-        console.error(err);
-        log('❌ LOAD ERROR:', err.message, '\nSTACK:', err.stack);
-        setStatus('Kunde inte ladda modell/metadata. Se Debug & Console.');
-      }
-    }
+            const output = model.predict(input);
+            const prob = (await output.data())[0];
 
-    async function analyze(){
-      const txt = $text.value.trim();
-      if (!txt){ setStatus('Skriv något först 😊'); return; }
-      $btn.disabled = true;
-      setStatus('Analyserar…');
-      try{
-        const input = vectorize(txt);
-        log('Vector shape:', input.shape);
+            document.getElementById("output").innerHTML =
+                prob >= 0.5
+                    ? `Positiv (${(prob * 100).toFixed(1)}%)`
+                    : `Negativ (${(prob * 100).toFixed(1)}%)`;
 
-        let p = 0.0;
-        if (!isGraph){
-          const out = tf.tidy(()=>model.predict(input));
-          const data = await out.data();
-          out.dispose();
-          log('Raw output (Layers):', Array.from(data));
-          p = data.length===1 ? data[0] : (data[1] ?? data[0]); // byt till data[1] om [neg,pos]
-        } else {
-          const inName = model?.executor?._inputs?.[0]?.name;
-          const outName = model?.executor?._outputs?.[0]?.name;
-          if (!inName || !outName) throw new Error('GraphModel saknar kända input/output‑namn – se debug och fyll i.');
-          const feeds = {}; feeds[inName] = input;
-          const out = await model.executeAsync(feeds, outName);
-          const data = Array.isArray(out) ? await out[0].data() : await out.data();
-          if (Array.isArray(out)) out[0].dispose(); else out.dispose();
-          log('Raw output (Graph):', Array.from(data));
-          p = data.length===1 ? data[0] : (data[1] ?? data[0]);
+            input.dispose();
+            output.dispose();
         }
-        setOutput(p);
-        setStatus('Klart.');
-      }catch(err){
-        console.error(err);
-        log('❌ INFERENCE ERROR:', err.message, '\nSTACK:', err.stack);
-        setStatus('Fel vid inferens. Se Debug & Console.');
-      }finally{
-        $btn.disabled = false;
-      }
-    }
 
-    document.getElementById('analyzeBtn').addEventListener('click', analyze);
-    document.getElementById('clearBtn').addEventListener('click', ()=>{
-      $text.value=""; $label.style.display="none"; $probBar.style.width="0%"; $probText.textContent="–";
-      setStatus('Rensat. Skriv en ny recension.'); $text.focus(); log('UI cleared.');
-    });
-
-    loadAll();
-  </script>
+        // 🚀 Ladda vid start
+        loadModel();
+    </script>
 </body>
 </html>
