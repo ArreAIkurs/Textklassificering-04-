@@ -4,116 +4,71 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Biorecensions-analys (Sentiment)</title>
-  <meta name="description" content="Webbapp som analyserar om en biorecension är positiv eller negativ med en TF.js-modell." />
-
   <style>
-    :root {
-      --bg: #0b1220; --card: #111a2b; --accent: #3b82f6; --accent-2: #14b8a6;
-      --text: #e5e7eb; --muted: #93a1b1; --bad: #ef4444; --good: #22c55e;
-      --border: #1f2a44;
-      --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    html, body { background:#0b1220; color:var(--text); margin:0; font-family:var(--font); }
-    .wrap { max-width: 1080px; margin: 3rem auto; padding: 0 1rem; }
-    header h1 { margin:0 0 .4rem; font-size: clamp(1.6rem, 1rem + 2vw, 2.2rem); }
-    header p { margin:.2rem 0 0; color:var(--muted); }
-
-    .grid { display:grid; gap:1rem; grid-template-columns: 1fr; }
-    @media (min-width: 1000px) { .grid { grid-template-columns: 1.1fr .9fr; } }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
-      border:1px solid var(--border); border-radius:16px; padding:1rem;
-    }
-    label { font-weight:600; display:block; margin-bottom:.5rem; }
-    textarea {
-      width:100%; min-height:180px; resize:vertical; background:#0e172a; color:var(--text);
-      border:1px solid var(--border); border-radius:12px; padding:.9rem 1rem; font-size:1rem;
-    }
-    .controls { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; margin-top:.75rem; }
-    button {
-      appearance:none; border:0; background:linear-gradient(90deg, var(--accent), var(--accent-2));
-      color:#fff; padding:.8rem 1.1rem; border-radius:12px; font-weight:700; cursor:pointer;
-    }
-    button:disabled { opacity:.55; cursor:not-allowed; }
-    .status { color:var(--muted); }
-
-    .pill { display:inline-flex; gap:.5rem; align-items:center; padding:.4rem .7rem; border-radius:999px; font-weight:800; }
-    .pill.pos { background:linear-gradient(90deg,#16a34a,#22c55e); }
-    .pill.neg { background:linear-gradient(90deg,#ef4444,#f87171); }
-
-    .out { background:#0d1526; border:1px solid var(--border); border-radius:12px; padding:1rem; }
-    .bar { height:12px; border-radius:999px; background:#0b1220; border:1px solid var(--border); overflow:hidden; }
-    .bar>span { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transition:width .2s ease; }
-
-    /* Debug-panel */
-    .debug {
-      background:#0a1324; border:1px solid var(--border); border-radius:12px; padding:.75rem; height:260px; overflow:auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:.9rem; white-space:pre-wrap;
-    }
-    .debug-actions { display:flex; gap:.5rem; margin:.5rem 0 .2rem; }
-    .badge { display:inline-block; padding:.1rem .4rem; border-radius:6px; background:#0e172a; border:1px solid var(--border); color:#cbd5e1; }
-    footer { margin-top:1rem; color:var(--muted); font-size:.92rem; }
-    code.kbd { background:#0e172a; border:1px solid var(--border); padding:.05rem .35rem; border-radius:6px; }
+    body{margin:0;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1000px;margin:3rem auto;padding:0 1rem}
+    .grid{display:grid;gap:1rem;grid-template-columns:1fr}
+    @media(min-width:1000px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));border:1px solid #1f2a44;border-radius:16px;padding:1rem}
+    textarea{width:100%;min-height:180px;background:#0e172a;color:#e5e7eb;border:1px solid #1f2a44;border-radius:12px;padding:.9rem 1rem}
+    button{border:0;background:linear-gradient(90deg,#3b82f6,#14b8a6);color:#fff;padding:.8rem 1.1rem;border-radius:12px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .pill{display:inline-flex;padding:.4rem .7rem;border-radius:999px;font-weight:800}
+    .pos{background:linear-gradient(90deg,#16a34a,#22c55e)} .neg{background:linear-gradient(90deg,#ef4444,#f87171)}
+    .bar{height:12px;border-radius:999px;background:#0b1220;border:1px solid #1f2a44;overflow:hidden}
+    .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#14b8a6);transition:width .2s}
+    .debug{background:#0a1324;border:1px solid #1f2a44;border-radius:12px;padding:.75rem;height:260px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>Analys av biorecension – Positiv eller negativ?</h1>
-      <p>Skriv en recension och klicka <strong>Analysera</strong>. Modellen körs i webbläsaren (TensorFlow.js).</p>
-    </header>
+    <h1>Analys av biorecension – Positiv eller negativ?</h1>
+    <p>Skriv en recension, klicka <b>Analysera</b>. Allt körs i webbläsaren.</p>
 
     <div class="grid">
-      <!-- Vänster: inmatning -->
       <section class="card">
         <label for="inputText">Din recension</label>
-        <textarea id="inputText" placeholder="Exempel: Filmen var fantastisk! Jag vill se den igen."></textarea>
-        <div class="controls">
+        <textarea id="inputText" placeholder="Exempel: Filmen var fantastisk!"></textarea>
+        <div style="display:flex;gap:.75rem;align-items:center;margin-top:.75rem">
           <button id="analyzeBtn" disabled>Analysera</button>
           <button id="clearBtn">Rensa</button>
-          <span class="status" id="status">Laddar…</span>
+          <span id="status" style="color:#93a1b1">Laddar…</span>
         </div>
       </section>
 
-      <!-- Höger: resultat + debug -->
       <aside class="card">
-        <h3 style="margin:.2rem 0 .6rem;">Resultat</h3>
-        <div class="out">
-          <div id="label" class="pill" style="display:none;"></div>
-          <div style="margin:.6rem 0 .25rem;">Sannolikhet (positiv)</div>
+        <h3>Resultat</h3>
+        <div style="background:#0d1526;border:1px solid #1f2a44;border-radius:12px;padding:1rem">
+          <div id="label" class="pill" style="display:none"></div>
+          <div style="margin:.6rem 0 .25rem">Sannolikhet (positiv)</div>
           <div class="bar"><span id="probBar"></span></div>
-          <div style="margin-top:.4rem;"><span id="probText">–</span></div>
-          <div style="margin-top:.4rem; color:#93a1b1; font-size:.9rem;">Tröskel: <code class="kbd" id="thresholdText">0.50</code></div>
+          <div style="margin-top:.4rem"><span id="probText">–</span></div>
+          <div style="margin-top:.4rem;color:#93a1b1;font-size:.9rem">Tröskel: <code id="thresholdText">0.50</code></div>
         </div>
 
-        <h3 style="margin:1rem 0 .5rem;">Debug</h3>
-        <div class="debug-actions">
-          <span class="badge" id="envBadge">–</span>
+        <h3 style="margin-top:1rem">Debug</h3>
+        <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
+          <span id="envBadge" style="background:#0e172a;border:1px solid #1f2a44;border-radius:6px;padding:.1rem .4rem">–</span>
           <button id="copyLogBtn">Kopiera logg</button>
           <button id="clearLogBtn">Rensa logg</button>
         </div>
         <div id="debug" class="debug" aria-live="polite"></div>
       </aside>
     </div>
-
-    <footer>
-      <p><strong>GitHub Pages:</strong> Eftersom alla filer ligger i samma mapp räcker det att aktivera Pages (Settings → Pages) för vald branch och mapp, så betjänas allt korrekt.</p>
-    </footer>
   </div>
 
-  <!-- ✅ Rätt TF.js-laddning -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <!-- ✅ RÄTT! TensorFlow.js laddas korrekt -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js" crossorigin="anonymous"></script>
 
   <script>
-    // === Konfiguration ===
-    // Alla filer ligger i samma mapp som index.html → lämna BASE_PATH tomt:
-    const BASE_PATH = "";               // ändra till "models/" om du senare flyttar filerna
-    const MODEL_URL = BASE_PATH + "model.json";
-    const METADATA_URL = BASE_PATH + "metadata.json";
+    // ===== Konfiguration (alla filer i samma mapp) =====
+    const VERSION = 'v1'; // öka vid behov för cache-bust
+    const BASE_PATH = "";
+    const MODEL_URL = BASE_PATH + "model.json?" + VERSION;
+    const METADATA_URL = BASE_PATH + "metadata.json?" + VERSION;
     const THRESHOLD = 0.5;
 
-    // === UI refs ===
+    // ===== UI refs =====
     const $status = document.getElementById("status");
     const $btn = document.getElementById("analyzeBtn");
     const $clear = document.getElementById("clearBtn");
@@ -126,264 +81,181 @@
     const $envBadge = document.getElementById("envBadge");
     const $copyLogBtn = document.getElementById("copyLogBtn");
     const $clearLogBtn = document.getElementById("clearLogBtn");
-    if ($thresholdText) $thresholdText.textContent = THRESHOLD.toFixed(2);
+    $thresholdText.textContent = THRESHOLD.toFixed(2);
 
-    // === Debug logger ===
+    // ===== Debug logger + globala fel fångare =====
     let debugBuffer = [];
-    function ts() {
-      const d = new Date();
-      return d.toISOString().split("T")[1].replace("Z","");
-    }
-    function log(...args) {
-      const msg = args.map(a => {
-        try { return (typeof a === 'string') ? a : JSON.stringify(a, null, 2); }
-        catch { return String(a); }
-      }).join(" ");
-      const line = `[${ts()}] ${msg}`;
+    function ts(){ return new Date().toISOString().split('T')[1].replace('Z',''); }
+    function log(...args){
+      const line = `[${ts()}] ` + args.map(a => {
+        try{ return typeof a === 'string' ? a : JSON.stringify(a,null,2); }catch{ return String(a); }
+      }).join(' ');
       debugBuffer.push(line);
-      if ($debug) {
-        $debug.textContent += ($debug.textContent ? "\n" : "") + line;
-        $debug.scrollTop = $debug.scrollHeight;
-      }
+      $debug.textContent += ($debug.textContent ? "\n" : "") + line;
+      $debug.scrollTop = $debug.scrollHeight;
       console.log("[DEBUG]", ...args);
     }
-    $copyLogBtn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(debugBuffer.join("\n"));
-        log("📋 Kopierade loggen till urklipp.");
-      } catch(e) { log("⚠️ Kunde inte kopiera logg:", e?.message || e.toString()); }
-    });
-    $clearLogBtn.addEventListener("click", () => {
-      debugBuffer = [];
-      $debug.textContent = "";
-      log("🧹 Rensade debuglogg.");
-    });
-    function setStatus(msg) { if ($status) $status.textContent = msg; log("STATUS:", msg); }
+    window.addEventListener('error', e => log('WINDOW ERROR:', e.message, e.filename, e.lineno + ':' + e.colno));
+    window.addEventListener('unhandledrejection', e => log('UNHANDLED REJECTION:', e.reason?.message || String(e.reason)));
 
-    // === Modellmetadata ===
-    let model = null, metadata = null;
-    let isGraphModel = false;
-    let wordIndex = {};
-    let maxLen = 100;
-    let lowercase = true;
-    let oovToken = "<OOV>";
-    let vocabSize = null;
+    $copyLogBtn.onclick = async () => {
+      try{ await navigator.clipboard.writeText(debugBuffer.join("\n")); log("📋 Kopierade loggen."); }catch(e){ log("⚠️ Clipboard error:", e.message); }
+    };
+    $clearLogBtn.onclick = () => { debugBuffer = []; $debug.textContent = ""; log("🧹 Rensade debug."); };
 
-    // För GraphModel, om du behöver namnen – fyll i efter första loggen:
-    const GRAPH_INPUT_NAME = null;   // t.ex. "serving_default_input_1:0"
-    const GRAPH_OUTPUT_NAME = null;  // t.ex. "StatefulPartitionedCall:0"
+    function setStatus(msg){ $status.textContent = msg; log("STATUS:", msg); }
 
-    function simpleNormalize(s) {
-      let t = lowercase ? s.toLowerCase() : s;
-      t = t.normalize('NFKC').replace(/[^a-zåäöA-ZÅÄÖ0-9]+/g, ' ').trim();
-      return t;
+    // ===== Text → vektor =====
+    let model=null, metadata=null, isGraph=false;
+    let wordIndex={}, maxLen=100, lowercase=true, oovToken="<OOV>", vocabSize=null;
+    const GRAPH_INPUT_NAME=null, GRAPH_OUTPUT_NAME=null; // fyll i om Graph kräver
+
+    function simpleNormalize(s){ let t = lowercase ? s.toLowerCase() : s; return t.normalize('NFKC').replace(/[^a-zåäöA-ZÅÄÖ0-9]+/g,' ').trim(); }
+    function tokenize(s){ const n=simpleNormalize(s); return n? n.split(/\s+/) : []; }
+    function vectorize(text){
+      const tokens = tokenize(text), seq=[];
+      const oov = wordIndex[oovToken] ?? wordIndex["<oov>"] ?? wordIndex["<unk>"] ?? 1;
+      for(const tok of tokens){ let idx = wordIndex[tok]; if(idx==null) idx = oov; if(vocabSize && idx>=vocabSize) idx = oov; seq.push(idx); }
+      const pad = new Array(maxLen).fill(0); const start = Math.max(0, maxLen - seq.length);
+      for(let i=0;i<Math.min(seq.length,maxLen);i++){ pad[start+i] = seq[seq.length - Math.min(seq.length,maxLen) + i]; }
+      return tf.tensor2d([pad],[1,maxLen]);
     }
-    function tokenize(text) {
-      const norm = simpleNormalize(text);
-      if (!norm) return [];
-      return norm.split(/\s+/);
-    }
-    function vectorize(text) {
-      const tokens = tokenize(text);
-      const seq = [];
-      const oovIndex = wordIndex[oovToken] ?? wordIndex["<oov>"] ?? wordIndex["<unk>"] ?? 1;
-      for (const tok of tokens) {
-        let idx = wordIndex[tok];
-        if (idx == null) idx = (oovIndex ?? 1);
-        if (vocabSize && idx >= vocabSize) idx = (oovIndex ?? 1);
-        seq.push(idx);
-      }
-      const padded = new Array(maxLen).fill(0);
-      const start = Math.max(0, maxLen - seq.length);
-      for (let i = 0; i < Math.min(seq.length, maxLen); i++) {
-        padded[start + i] = seq[seq.length - Math.min(seq.length, maxLen) + i];
-      }
-      return tf.tensor2d([padded], [1, maxLen]);
+    function setOutput(p){
+      const pos = p>=THRESHOLD;
+      $label.style.display = "inline-flex";
+      $label.textContent = pos ? "Positiv" : "Negativ";
+      $label.className = "pill " + (pos ? "pos" : "neg");
+      $probBar.style.width = Math.max(2, Math.round(p*100)) + "%";
+      $probText.textContent = (p*100).toFixed(1) + " %";
+      log("RESULT:", {probability_positive:p, label: pos?"Positiv":"Negativ"});
     }
 
-    function setOutput(prob) {
-      const isPos = prob >= THRESHOLD;
-      if ($label) {
-        $label.style.display = "inline-flex";
-        $label.textContent = isPos ? "Positiv" : "Negativ";
-        $label.className = "pill " + (isPos ? "pos" : "neg");
-      }
-      if ($probBar) $probBar.style.width = Math.max(2, Math.round(prob * 100)) + "%";
-      if ($probText) $probText.textContent = (prob * 100).toFixed(1) + " %";
-      log("RESULT:", { probability_positive: prob, label: isPos ? "Positiv" : "Negativ" });
+    async function safeFetch(url, opts){
+      const r = await fetch(url, {cache:'no-store', ...opts});
+      log(opts?.method || 'GET', url, '→', r.status, r.statusText, '| CT:', r.headers.get('content-type'));
+      if(!r.ok) throw new Error(`HTTP ${r.status} on ${url}`);
+      return r;
     }
 
-    async function safeFetch(url, opts) {
-      const res = await fetch(url, { cache: "no-store", ...opts });
-      log(opts?.method || "GET", url, "→", res.status, res.statusText, "| Content-Type:", res.headers.get("content-type"));
-      if (!res.ok) throw new Error(`HTTP ${res.status} vid hämtning av ${url}`);
-      return res;
-    }
-
-    async function headCheck(url) {
-      try {
-        const res = await fetch(url, { method: "HEAD", cache: "no-store" });
-        log("HEAD", url, "→", res.status, res.statusText, "| Content-Type:", res.headers.get("content-type"));
-        return res.ok;
-      } catch (e) {
-        log("HEAD ERROR", url, e?.message || e.toString());
-        return false;
-      }
-    }
-
-    async function detectModelFormat() {
+    async function detectModelFormat(){
       const res = await safeFetch(MODEL_URL);
-      const json = await res.json();
-
-      if (json.format && String(json.format).toLowerCase().includes("graph")) {
-        isGraphModel = true;
-        log("🔎 Upptäckte GRAPH-modell enligt model.json (format:", json.format, ")");
-      } else if (json.modelTopology) {
-        isGraphModel = false;
-        log("🔎 Upptäckte LAYERS-modell (modelTopology finns).");
-      } else {
-        log("⚠️ Kunde inte avgöra modelltyp från model.json; testar LAYERS först, sedan GRAPH vid fel.");
-        isGraphModel = false;
-      }
-
-      if (json.weightsManifest) log("weightsManifest:", json.weightsManifest);
-      return json;
+      const j = await res.json();
+      if (j.format && String(j.format).toLowerCase().includes('graph')) { isGraph = true; log('🔎 GRAPH-modell (format:', j.format, ')'); }
+      else if (j.modelTopology) { isGraph = false; log('🔎 LAYERS-modell (modelTopology finns).'); }
+      else { isGraph = false; log('⚠️ Okänt; testar LAYERS först, fallback till GRAPH.'); }
+      if (j.weightsManifest) log('weightsManifest:', j.weightsManifest);
+      return j;
     }
 
-    async function loadAll() {
-      try {
-        $envBadge.textContent = location.hostname ? ("host: " + location.hostname) : "local file";
-        log("💡 Location:", window.location.href);
-        log("💡 BASE_PATH:", BASE_PATH);
-        log("💡 MODEL_URL:", MODEL_URL);
-        log("💡 METADATA_URL:", METADATA_URL);
+    async function loadAll(){
+      $envBadge.textContent = location.hostname ? ('host: '+location.hostname) : 'local file';
+      log('Location:', location.href);
 
-        // Snabb kontroll: finns filerna?
-        await headCheck(MODEL_URL);
-        await headCheck(METADATA_URL);
+      // 0) Finns TF.js?
+      if (typeof tf === 'undefined') {
+        setStatus('TF.js laddades inte – kontrollera script‑taggen/uppkopplingen.');
+        log('❌ tf är undefined. CDN kanske blockat/offline.');
+        return;
+      }
+      log('TFJS version:', tf?.version?.tfjs);
 
-        setStatus("Initierar…");
-        log("TFJS version:", tf?.version?.tfjs);
+      try{
+        // 1) Kolla att filerna finns
+        await fetch('model.json', {method:'HEAD'}).then(r=>log('HEAD model.json →', r.status, r.statusText));
+        await fetch('metadata.json', {method:'HEAD'}).then(r=>log('HEAD metadata.json →', r.status, r.statusText));
 
-        // 1) Upptäck modelltyp
+        // 2) Upptäck modelltyp
+        setStatus('Läser model.json…');
         await detectModelFormat();
 
-        // 2) Ladda metadata
-        setStatus("Laddar metadata…");
+        // 3) Ladda metadata
+        setStatus('Laddar metadata…');
         const meta = await safeFetch(METADATA_URL);
         metadata = await meta.json();
-        log("metadata:", metadata);
-
         if (metadata.word_index) wordIndex = metadata.word_index;
         if (metadata.max_len) maxLen = metadata.max_len;
         if (metadata.lowercase !== undefined) lowercase = !!metadata.lowercase;
         if (metadata.oov_token) oovToken = metadata.oov_token;
         if (metadata.vocabulary_size) vocabSize = metadata.vocabulary_size;
+        log('metadata:', metadata);
 
-        // 3) Ladda modellen med rätt loader (med fallback)
-        setStatus("Laddar modell…");
-        try {
-          if (isGraphModel) {
-            model = await tf.loadGraphModel(MODEL_URL);
-            log("✅ GRAPH-modell laddad.");
-          } else {
-            model = await tf.loadLayersModel(MODEL_URL);
-            log("✅ LAYERS-modell laddad.");
-          }
-        } catch (e1) {
-          log("❌ Första laddningsförsöket misslyckades:", e1.message);
-          if (isGraphModel) {
-            log("Provar LAYERS som fallback…");
-            model = await tf.loadLayersModel(MODEL_URL);
-            isGraphModel = false;
-          } else {
-            log("Provar GRAPH som fallback…");
-            model = await tf.loadGraphModel(MODEL_URL);
-            isGraphModel = true;
-          }
-          log("✅ Lyckades ladda via fallback. isGraphModel =", isGraphModel);
+        // 4) Lasta modell (med fallback)
+        setStatus('Laddar modell…');
+        try{
+          model = isGraph ? await tf.loadGraphModel(MODEL_URL) : await tf.loadLayersModel(MODEL_URL);
+          log('✅ Modell laddad som', isGraph ? 'GRAPH' : 'LAYERS');
+        }catch(e1){
+          log('❌ Första laddningen misslyckades:', e1.message);
+          // prova andra varianten
+          model = isGraph ? await tf.loadLayersModel(MODEL_URL) : await tf.loadGraphModel(MODEL_URL);
+          isGraph = !isGraph;
+          log('✅ Lyckades via fallback. isGraph =', isGraph);
         }
 
-        // 4) Varmkör / lista I/O-namn
-        if (!isGraphModel) {
-          tf.tidy(() => model.predict(tf.zeros([1, maxLen])));
+        // 5) Warmup / I/O-namn vid Graph
+        if (!isGraph) {
+          tf.tidy(()=>model.predict(tf.zeros([1,maxLen])));
         } else {
-          // Visa tillgängliga input/output-namn (behövs vid executeAsync)
-          const ins = model?.executor?._inputs?.map(t => t.name);
-          const outs = model?.executor?._outputs?.map(t => t.name);
-          log("GraphModel inputTensorNames:", ins);
-          log("GraphModel outputTensorNames:", outs);
+          const ins = model?.executor?._inputs?.map(t=>t.name);
+          const outs = model?.executor?._outputs?.map(t=>t.name);
+          log('Graph inputs:', ins);
+          log('Graph outputs:', outs);
         }
 
-        setStatus("Klar. Skriv en recension och klicka Analysera.");
+        setStatus('Klar. Skriv en recension och klicka Analysera.');
         $btn.disabled = false;
-      } catch (err) {
+
+      }catch(err){
         console.error(err);
-        log("❌ LOAD ERROR:", err?.message || err.toString(), "\nSTACK:", err?.stack);
-        setStatus("Kunde inte ladda modell/metadata. Se Debug (och Console).");
+        log('❌ LOAD ERROR:', err.message, '\nSTACK:', err.stack);
+        setStatus('Kunde inte ladda modell/metadata. Se Debug & Console.');
       }
     }
 
-    async function analyze() {
+    async function analyze(){
       const txt = $text.value.trim();
-      if (!txt) { setStatus("Skriv något först 😊"); return; }
+      if (!txt){ setStatus('Skriv något först 😊'); return; }
       $btn.disabled = true;
-      setStatus("Analyserar…");
-      try {
+      setStatus('Analyserar…');
+      try{
         const input = vectorize(txt);
-        log("Vector shape:", input.shape);
+        log('Vector shape:', input.shape);
 
-        let probPositive = null;
-
-        if (!isGraphModel) {
-          // LAYERS
-          const out = tf.tidy(() => model.predict(input));
+        let p = 0.0;
+        if (!isGraph){
+          const out = tf.tidy(()=>model.predict(input));
           const data = await out.data();
           out.dispose();
-          log("Raw output (Layers):", Array.from(data));
-          // Antag 1-utgång (sigmoid); om du tränat [neg, pos], ta data[1].
-          probPositive = data.length === 1 ? data[0] : (data[1] ?? data[0]);
+          log('Raw output (Layers):', Array.from(data));
+          p = data.length===1 ? data[0] : (data[1] ?? data[0]); // byt till data[1] om [neg,pos]
         } else {
-          // GRAPH
-          const inName = GRAPH_INPUT_NAME || (model?.executor?._inputs?.[0]?.name);
-          const outName = GRAPH_OUTPUT_NAME || (model?.executor?._outputs?.[0]?.name);
-          log("Using input:", inName, "output:", outName);
-          if (!inName || !outName) {
-            throw new Error("Kan inte köra GraphModel utan kända input/output-namn. Se debuglistan ovan och sätt GRAPH_INPUT_NAME/GRAPH_OUTPUT_NAME i koden.");
-          }
-          const feeds = {};
-          feeds[inName] = input;
+          const inName = model?.executor?._inputs?.[0]?.name;
+          const outName = model?.executor?._outputs?.[0]?.name;
+          if (!inName || !outName) throw new Error('GraphModel saknar kända input/output‑namn – se debug och fyll i.');
+          const feeds = {}; feeds[inName] = input;
           const out = await model.executeAsync(feeds, outName);
           const data = Array.isArray(out) ? await out[0].data() : await out.data();
           if (Array.isArray(out)) out[0].dispose(); else out.dispose();
-          log("Raw output (Graph):", Array.from(data));
-          probPositive = data.length === 1 ? data[0] : (data[1] ?? data[0]);
+          log('Raw output (Graph):', Array.from(data));
+          p = data.length===1 ? data[0] : (data[1] ?? data[0]);
         }
-
-        setOutput(probPositive);
-        setStatus("Klart.");
-      } catch (err) {
+        setOutput(p);
+        setStatus('Klart.');
+      }catch(err){
         console.error(err);
-        log("❌ INFERENCE ERROR:", err?.message || err.toString(), "\nSTACK:", err?.stack);
-        setStatus("Fel vid inferens. Se Debug & Console.");
-      } finally {
+        log('❌ INFERENCE ERROR:', err.message, '\nSTACK:', err.stack);
+        setStatus('Fel vid inferens. Se Debug & Console.');
+      }finally{
         $btn.disabled = false;
       }
     }
 
-    // Event handlers
-    document.getElementById("analyzeBtn").addEventListener("click", analyze);
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      $text.value = "";
-      $label.style.display = "none";
-      $probBar.style.width = "0%";
-      $probText.textContent = "–";
-      setStatus("Rensat. Skriv en ny recension.");
-      $text.focus();
-      log("UI cleared.");
+    document.getElementById('analyzeBtn').addEventListener('click', analyze);
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      $text.value=""; $label.style.display="none"; $probBar.style.width="0%"; $probText.textContent="–";
+      setStatus('Rensat. Skriv en ny recension.'); $text.focus(); log('UI cleared.');
     });
 
-    // Start
     loadAll();
   </script>
 </body>
