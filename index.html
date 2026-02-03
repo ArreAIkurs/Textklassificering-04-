@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="sv">
+
 <head>
     <meta charset="UTF-8">
     <title>Sentimentanalys</title>
@@ -9,51 +10,52 @@
     <h2>Analys av text (positiv/negativ)</h2>
 
     <textarea id="inputText" rows="5" cols="50"
-              placeholder="Skriv recension här..."></textarea>
+              placeholder="Skriv recension..."></textarea>
     <br><br>
 
     <button onclick="analyze()">Analysera</button>
 
     <h3>Resultat:</h3>
-    <div id="output">–</div>
+    <div id="output">Modell laddas…</div>
 
-    <!-- 🔥 RÄTT TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <!-- RÄTT TensorFlow.js -->
+    https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js</script>
 
     <script>
         let model;
-        let metadata;
-        let wordIndex = {};
-        let maxLen = 100;
-        let oov = 1;
+        let maxLen = 256;
+        let vocabSize = 10000;
 
-        // 🔥 Ladda modell + metadata
-        async function loadModel() {
+        async function loadEverything() {
             try {
+                // Ladda TFJS-modell
                 model = await tf.loadLayersModel("model.json");
-                metadata = await fetch("metadata.json").then(r => r.json());
 
-                wordIndex = metadata.word_index;
-                maxLen = metadata.max_len;
-                oov = wordIndex[metadata.oov_token] || 1;
-
-                document.getElementById("output").innerText = "Modell laddad.";
-            } catch (e) {
                 document.getElementById("output").innerText =
-                    "Kunde inte ladda modell/metadata.";
-                console.error(e);
+                    "Modell laddad ✔";
+
+            } catch (err) {
+                document.getElementById("output").innerText =
+                    "Kunde inte ladda modell.";
+                console.error(err);
             }
         }
 
-        // 🔥 Tokenisering + padding
-        function textToTensor(text) {
+        // Fallback-tokenizer (använder enkel hashing)
+        function tokenize(text) {
             text = text.toLowerCase().replace(/[^a-zåäö0-9]+/g, " ").trim();
-            const tokens = text.split(" ");
+            const words = text.split(/\s+/);
 
-            let seq = tokens.map(t =>
-                wordIndex[t] ? wordIndex[t] : oov
-            );
+            let seq = words.map(w => {
+                // Hash → index inom [1, vocabSize)
+                let hash = 0;
+                for (let i = 0; i < w.length; i++) {
+                    hash = (hash * 31 + w.charCodeAt(i)) % vocabSize;
+                }
+                return hash;
+            });
 
+            // Padding: längst bak blir början
             let padded = new Array(maxLen).fill(0);
             let start = Math.max(0, maxLen - seq.length);
 
@@ -64,25 +66,30 @@
             return tf.tensor2d([padded]);
         }
 
-        // 🔥 Analys
         async function analyze() {
             const text = document.getElementById("inputText").value;
-            const input = textToTensor(text);
+            if (!text.trim()) {
+                document.getElementById("output").innerText =
+                    "Skriv text först!";
+                return;
+            }
 
-            const output = model.predict(input);
-            const prob = (await output.data())[0];
+            const input = tokenize(text);
+
+            const pred = model.predict(input);
+            const prob = (await pred.data())[0];
+
+            const label = prob >= 0.5 ? "Positiv" : "Negativ";
 
             document.getElementById("output").innerHTML =
-                prob >= 0.5
-                    ? `Positiv (${(prob * 100).toFixed(1)}%)`
-                    : `Negativ (${(prob * 100).toFixed(1)}%)`;
+                `${label}<br><br>Sannolikhet: ${(prob * 100).toFixed(1)} %`;
 
             input.dispose();
-            output.dispose();
+            pred.dispose();
         }
 
-        // 🚀 Ladda vid start
-        loadModel();
+        loadEverything();
     </script>
+
 </body>
 </html>
