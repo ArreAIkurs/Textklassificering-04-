@@ -1,95 +1,79 @@
 <!DOCTYPE html>
 <html lang="sv">
-
 <head>
     <meta charset="UTF-8">
-    <title>Sentimentanalys</title>
+    <title>MODEL DEBUG</title>
 </head>
-
 <body>
-    <h2>Analys av text (positiv/negativ)</h2>
 
-    <textarea id="inputText" rows="5" cols="50"
-              placeholder="Skriv recension..."></textarea>
-    <br><br>
+<h1>TFJS MODEL DEBUG</h1>
 
-    <button onclick="analyze()">Analysera</button>
+<pre id="log" style="font-size:16px; white-space:pre-wrap;"></pre>
 
-    <h3>Resultat:</h3>
-    <div id="output">Modell laddas…</div>
+<!-- RÄTT TF.JS -->
+https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js</script>
 
-    <!-- RÄTT TensorFlow.js -->
-    https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js</script>
+<script>
+const logElem = document.getElementById("log");
+function log(...msg) {
+    console.log(...msg);
+    logElem.textContent += msg.join(" ") + "\n";
+}
 
-    <script>
-        let model;
-        let maxLen = 256;
-        let vocabSize = 10000;
+async function testURL(url) {
+    try {
+        const res = await fetch(url, { cache: "no-store" });
+        log("GET", url, "→", res.status, res.statusText);
+        if (!res.ok) throw new Error("HTTP status " + res.status);
+        return await res.text();
+    } catch (e) {
+        log("ERROR loading", url, ":", e);
+        throw e;
+    }
+}
 
-        async function loadEverything() {
-            try {
-                // Ladda TFJS-modell
-                model = await tf.loadLayersModel("model.json");
+async function main() {
+    log("➡️ STARTAR DEBUG…\n");
 
-                document.getElementById("output").innerText =
-                    "Modell laddad ✔";
+    // 1. Kolla model.json
+    log("🔍 Läser model.json …");
+    let modelJson = await testURL("model.json");
+    let parsed;
 
-            } catch (err) {
-                document.getElementById("output").innerText =
-                    "Kunde inte ladda modell.";
-                console.error(err);
-            }
-        }
+    try {
+        parsed = JSON.parse(modelJson);
+        log("✔ model.json är giltig JSON");
+    } catch (e) {
+        log("❌ model.json är INTE giltig JSON!", e);
+        return;
+    }
 
-        // Fallback-tokenizer (använder enkel hashing)
-        function tokenize(text) {
-            text = text.toLowerCase().replace(/[^a-zåäö0-9]+/g, " ").trim();
-            const words = text.split(/\s+/);
+    // 2. Kolla shard-fil
+    const shard = parsed.weightsManifest?.[0]?.paths?.[0];
+    if (!shard) {
+        log("❌ Hittar ingen shard-path i model.json!");
+        return;
+    }
 
-            let seq = words.map(w => {
-                // Hash → index inom [1, vocabSize)
-                let hash = 0;
-                for (let i = 0; i < w.length; i++) {
-                    hash = (hash * 31 + w.charCodeAt(i)) % vocabSize;
-                }
-                return hash;
-            });
+    log("\n🔍 Läser shard:", shard);
+    await testURL(shard);
 
-            // Padding: längst bak blir början
-            let padded = new Array(maxLen).fill(0);
-            let start = Math.max(0, maxLen - seq.length);
+    // 3. Kolla metadata.json
+    log("\n🔍 Läser metadata.json …");
+    let metadata = await testURL("metadata.json");
+    try {
+        JSON.parse(metadata);
+        log("✔ metadata.json är giltig JSON");
+    } catch (e) {
+        log("❌ metadata.json är INTE giltig JSON!", e);
+        return;
+    }
 
-            for (let i = 0; i < Math.min(seq.length, maxLen); i++) {
-                padded[start + i] = seq[seq.length - Math.min(seq.length, maxLen) + i];
-            }
+    log("\n🎉 ALLA FILER GÅR ATT LÄSA UTAN FEL!");
+}
 
-            return tf.tensor2d([padded]);
-        }
-
-        async function analyze() {
-            const text = document.getElementById("inputText").value;
-            if (!text.trim()) {
-                document.getElementById("output").innerText =
-                    "Skriv text först!";
-                return;
-            }
-
-            const input = tokenize(text);
-
-            const pred = model.predict(input);
-            const prob = (await pred.data())[0];
-
-            const label = prob >= 0.5 ? "Positiv" : "Negativ";
-
-            document.getElementById("output").innerHTML =
-                `${label}<br><br>Sannolikhet: ${(prob * 100).toFixed(1)} %`;
-
-            input.dispose();
-            pred.dispose();
-        }
-
-        loadEverything();
-    </script>
+main();
+</script>
 
 </body>
 </html>
