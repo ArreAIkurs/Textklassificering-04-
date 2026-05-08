@@ -1,189 +1,94 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Filmrecensionsanalys – AI-modell (Keras/TFJS)</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<meta charset="UTF-8">
+<title>Filmrecension AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 600px; 
-            margin: 2rem auto; 
-            padding: 1rem;
-            background-color: #f9f9f9;
-        }
-        h1 { color: #333; margin-bottom: 0.3rem; }
-        h2 { color: #444; font-size: 1rem; font-weight: normal; margin-top:0; }
-        textarea { 
-            width: 100%; height: 120px; margin-bottom: 1rem; padding: 10px;
-            border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; 
-        }
-        button { 
-            padding: 12px 24px; font-size: 1rem; cursor: pointer; 
-            background: #007bff; color: white; border: none; border-radius: 4px;
-            transition: background 0.2s;
-        }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #result { 
-            margin-top: 1.5rem; padding: 1rem; background: white;
-            border-radius: 4px; min-height: 1.5em; font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        #tokens {
-            margin-top: 0.75rem; padding: 0.75rem; background: #fff;
-            border-radius: 4px; border: 1px dashed #ccd; font-family: monospace;
-            font-size: 0.9rem; white-space: pre-wrap; word-break: break-word;
-        }
-        #debug-box {
-            margin-top: 3rem; padding: 1rem; background-color: #eef;
-            border: 1px solid #ccd; border-radius: 4px; font-family: monospace;
-            font-size: 0.85rem; color: #333; height: 150px; overflow-y: auto;
-        }
-        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
-        .log-error { color: #d00; font-weight: bold; }
-        .log-success { color: #008800; }
-    </style>
+<style>
+body { font-family: Arial; max-width: 600px; margin: 40px auto; }
+textarea { width: 100%; height: 120px; }
+button { padding: 10px 20px; margin-top: 10px; }
+#result { margin-top:20px; font-weight:bold; }
+#debug { margin-top:20px; font-size:12px; color:#555; white-space: pre-line; }
+</style>
 </head>
+
 <body>
 
-    <h1>AI-analys av filmrecensioner</h1>
-    <h2>Skriv eller klistra in en filmrecension på engelska. Texten måste handla om en film.</h2>
+<h2>AI Filmrecension</h2>
 
-    <textarea id="textInput" placeholder="Exempel: 'The movie had a strong emotional impact, but the ending felt rushed.'"></textarea>
-    <br>
+<textarea id="textInput" placeholder="Write a movie review..."></textarea><br>
+<button id="predictBtn" disabled>Initierar...</button>
 
-    <button id="predictBtn" onclick="runPrediction()" disabled>⏳ Initierar...</button>
+<div id="result"></div>
+<div id="debug"></div>
 
-    <div id="result">Resultatet visas här...</div>
-    <div id="tokens"></div>
+<script>
+let model, metadata;
+const SEQ_LEN = 256;
 
-    <div id="debug-box">
-        <div class="log-entry"><strong>Debug-logg startad...</strong></div>
-    </div>
+function log(msg){
+    console.log(msg);
+    document.getElementById("debug").innerText += msg + "\n";
+}
 
-    <!-- 🎯 All JS-kod är identisk med din version, inklusive alla begränsningar -->
-    <script>
-        /* ——— ALLA FUNKTIONER OFÖRÄNDRADE ——— */
-        let model;
-        let metadata;
-        const SEQUENCE_LENGTH = 256; 
+async function loadModel(){
+    try{
+        log("Laddar metadata...");
+        const m = await fetch("./tfjs_model/metadata.json");
+        if(!m.ok) throw new Error("metadata saknas");
+        metadata = await m.json();
 
-        function log(message, type = 'info') {
-            const box = document.getElementById('debug-box');
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            const time = new Date().toLocaleTimeString();
-            entry.innerHTML = `<span style="color:#888">[${time}]</span> ${message}`;
-            if (type === 'error') entry.className += ' log-error';
-            if (type === 'success') entry.className += ' log-success';
-            box.appendChild(entry);
-            box.scrollTop = box.scrollHeight;
-        }
+        log("Laddar modell...");
+        model = await tf.loadLayersModel("./tfjs_model/model.json");
 
-        async function loadAssets() {
-            try {
-                const metaResponse = await fetch('tfjs_model/metadata.json');
-                metadata = await metaResponse.json();
+        log("✅ Klar");
 
-                model = await tf.loadLayersModel('tfjs_model/model.json');
+        const btn = document.getElementById("predictBtn");
+        btn.disabled = false;
+        btn.innerText = "Analysera";
+        btn.onclick = run;
 
-                const btn = document.getElementById('predictBtn');
-                btn.disabled = false;
-                btn.innerText = "Analysera filmrecension";
+    }catch(e){
+        log("❌ FEL: " + e.message);
+    }
+}
 
-                tf.tidy(() => {
-                    model.predict(tf.zeros([1, SEQUENCE_LENGTH]));
-                });
+function tokenize(text){
+    const words = text.toLowerCase()
+        .replace(/[^\w\s]/g,"")
+        .split(/\s+/);
 
-            } catch (err) {
-                log("KRITISKT FEL: " + err.message, 'error');
-            }
-        }
+    const wi = metadata.word_index;
+    const seq = words.map(w => wi[w] || 1);
 
-        loadAssets();
+    const padded = new Array(SEQ_LEN).fill(0);
+    for (let i=0; i<Math.min(seq.length, SEQ_LEN); i++){
+        padded[i] = seq[i];
+    }
+    return padded;
+}
 
-        function isLikelyEnglish(text) {
-            const hasNonAscii = /[^\x00-\x7F]/.test(text);
-            if (hasNonAscii) return false;
-            return /[a-zA-Z]/.test(text);
-        }
+function run(){
+    const text = document.getElementById("textInput").value;
+    if(!text) return;
 
-        function isMovieReview(text) {
-            const t = text.toLowerCase();
-            const movieKeywords = [
-                "movie","film","cinema","theater","director","actor","actress",
-                "plot","story","scene","soundtrack","score","cinematography",
-                "ending","sequel","prequel","trailer","cast","character"
-            ];
-            return movieKeywords.some(k => t.includes(k));
-        }
+    const input = tokenize(text);
 
-        function tokenizeWithWords(text) {
-            const cleaned = text
-                .toLowerCase()
-                .replace(/[.,!?;:()"'`]/g, '')
-                .trim();
-            const words = cleaned.length ? cleaned.split(/\s+/) : [];
-            const wordIndex = metadata.word_index;
+    const tensor = tf.tensor2d([input], [1, SEQ_LEN]);
+    const pred = model.predict(tensor);
+    const score = pred.dataSync()[0];
 
-            const OOV = 1, PAD = 0;
+    document.getElementById("result").innerText =
+        score > 0.5 ? "✅ Positiv recension" : "❌ Negativ recension";
 
-            const indices = words.map(w => wordIndex[w] || OOV);
+    tensor.dispose();
+    pred.dispose();
+}
 
-            const padded = new Array(SEQUENCE_LENGTH).fill(PAD);
-            for (let i = 0; i < Math.min(indices.length, SEQUENCE_LENGTH); i++) {
-                padded[i] = indices[i];
-            }
-
-            return { words, indices, padded };
-        }
-
-        async function runPrediction() {
-            const text = document.getElementById('textInput').value;
-            const resultDiv = document.getElementById('result');
-            const tokensDiv = document.getElementById('tokens');
-
-            if (!text) return;
-
-            if (!isLikelyEnglish(text)) {
-                resultDiv.innerText = "⚠️ Endast engelska filmrecensioner stöds.";
-                resultDiv.style.color = "#d00";
-                tokensDiv.textContent = "";
-                return;
-            }
-
-            if (!isMovieReview(text)) {
-                resultDiv.innerText = "⚠️ Texten måste handla om en film (t.ex. nämna 'movie', 'film', 'actor'...).";
-                resultDiv.style.color = "#d00";
-                tokensDiv.textContent = "";
-                return;
-            }
-
-            const { words, indices, padded } = tokenizeWithWords(text);
-
-            const tensor = tf.tensor2d([padded], [1, SEQUENCE_LENGTH]);
-            const pred = model.predict(tensor);
-            const score = pred.dataSync()[0];
-            const pct = (score * 100).toFixed(1);
-
-            if (score > 0.5) {
-                resultDiv.innerText = `Positiv filmrecension (${pct}%) 🎬✨`;
-                resultDiv.style.color = "green";
-            } else {
-                resultDiv.innerText = `Negativ eller neutral filmrecension (${pct}%) 🎬❌`;
-                resultDiv.style.color = "#d00";
-            }
-
-            tokensDiv.textContent =
-                words.map((w, i) => `${w}(${indices[i]})`).join("  ");
-
-            tensor.dispose();
-            pred.dispose();
-        }
-    </script>
+loadModel();
+</script>
 
 </body>
 </html>
