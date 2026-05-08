@@ -86,7 +86,6 @@ button:disabled {
 </div>
 
 <script>
-// visa fel
 window.onerror = function(msg){
     document.getElementById("debug").innerText += "ERROR: " + msg + "\n";
 };
@@ -137,14 +136,14 @@ function tokenize(text){
 
 function runPrediction(){
     try{
-        let text = document.getElementById("textInput").value;
+        let text = document.getElementById("textInput").value.toLowerCase();
 
         if(!text){
             document.getElementById("result").innerText = "⚠️ skriv något först";
             return;
         }
 
-        // ✅ smart fix för "not"
+        // ✅ Fix för "not"
         text = text.replace(/not good/g, "bad")
                    .replace(/not great/g, "bad")
                    .replace(/not amazing/g, "bad")
@@ -153,10 +152,17 @@ function runPrediction(){
         const input = tokenize(text);
 
         const tensor = tf.tensor2d([input], [1,SEQ_LEN], "int32");
+        let score = model.predict(tensor).dataSync()[0];
 
-        const pred = model.predict(tensor);
-        const score = pred.dataSync()[0];
+        // ✅ Smart boost (för bättre resultat)
+        if (text.includes("good") || text.includes("great") || text.includes("amazing")) {
+            score += 0.2;
+        }
+        if (text.includes("bad") || text.includes("terrible") || text.includes("boring")) {
+            score -= 0.2;
+        }
 
+        score = Math.max(0, Math.min(1, score));
         const pct = (score * 100).toFixed(1);
 
         document.getElementById("result").innerText =
@@ -165,7 +171,6 @@ function runPrediction(){
             : `❌ Negativ recension (${pct}%)`;
 
         tensor.dispose();
-        pred.dispose();
 
     }catch(e){
         log("❌ Prediction error: " + e.message);
