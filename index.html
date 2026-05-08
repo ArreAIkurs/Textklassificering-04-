@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 <style>
 body { font-family: Arial; max-width: 600px; margin: 40px auto; }
 textarea { width: 100%; height: 120px; }
 button { padding: 10px 20px; margin-top: 10px; }
-#result { margin-top:20px; font-weight:bold; }
+#result { margin-top:20px; font-weight:bold; font-size:18px; }
 #debug { margin-top:20px; font-size:12px; color:#555; white-space: pre-line; }
 </style>
 </head>
@@ -43,12 +44,12 @@ async function loadModel(){
         log("Laddar modell...");
         model = await tf.loadLayersModel("./tfjs_model/model.json");
 
-        log("✅ Klar");
+        log("✅ Modell laddad");
 
         const btn = document.getElementById("predictBtn");
         btn.disabled = false;
         btn.innerText = "Analysera";
-        btn.onclick = run;
+        btn.onclick = runPrediction;
 
     }catch(e){
         log("❌ FEL: " + e.message);
@@ -61,6 +62,11 @@ function tokenize(text){
         .split(/\s+/);
 
     const wi = metadata.word_index;
+
+    if(!wi){
+        throw new Error("word_index saknas i metadata");
+    }
+
     const seq = words.map(w => wi[w] || 1);
 
     const padded = new Array(SEQ_LEN).fill(0);
@@ -70,21 +76,41 @@ function tokenize(text){
     return padded;
 }
 
-function run(){
-    const text = document.getElementById("textInput").value;
-    if(!text) return;
+function runPrediction(){
+    try{
+        const text = document.getElementById("textInput").value;
 
-    const input = tokenize(text);
+        if(!text){
+            document.getElementById("result").innerText = "⚠️ Skriv något först";
+            return;
+        }
 
-    const tensor = tf.tensor2d([input], [1, SEQ_LEN]);
-    const pred = model.predict(tensor);
-    const score = pred.dataSync()[0];
+        if(!model){
+            document.getElementById("result").innerText = "⚠️ Modell ej laddad";
+            return;
+        }
 
-    document.getElementById("result").innerText =
-        score > 0.5 ? "✅ Positiv recension" : "❌ Negativ recension";
+        const input = tokenize(text);
 
-    tensor.dispose();
-    pred.dispose();
+        const tensor = tf.tensor2d([input], [1, SEQ_LEN], 'int32');
+
+        const pred = model.predict(tensor);
+        const score = pred.dataSync()[0];
+
+        log("Score: " + score);
+
+        const resultText = score > 0.5
+            ? "✅ Positiv recension"
+            : "❌ Negativ recension";
+
+        document.getElementById("result").innerText = resultText;
+
+        tensor.dispose();
+        pred.dispose();
+
+    }catch(e){
+        log("❌ Prediction error: " + e.message);
+    }
 }
 
 loadModel();
