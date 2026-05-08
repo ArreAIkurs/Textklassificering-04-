@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
 
+<!-- ✅ RÄTT SCRIPT -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 <style>
@@ -25,10 +26,6 @@ body {
     box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
-h2 {
-    margin-bottom: 10px;
-}
-
 textarea {
     width: 100%;
     height: 120px;
@@ -36,7 +33,6 @@ textarea {
     border-radius: 8px;
     border: 1px solid #ccc;
     margin-top: 10px;
-    font-size: 14px;
 }
 
 button {
@@ -48,7 +44,6 @@ button {
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    transition: 0.2s;
 }
 
 button:hover {
@@ -56,7 +51,7 @@ button:hover {
 }
 
 button:disabled {
-    background: #999;
+    background: #aaa;
 }
 
 #result {
@@ -81,7 +76,7 @@ button:disabled {
 <h2>🎬 AI Filmrecension</h2>
 <p>Skriv en filmrecension på engelska</p>
 
-<textarea id="textInput" placeholder="The movie was absolutely fantastic..."></textarea>
+<textarea id="textInput" placeholder="The movie was amazing..."></textarea>
 
 <button id="predictBtn" disabled>Initierar...</button>
 
@@ -91,6 +86,7 @@ button:disabled {
 </div>
 
 <script>
+// visa fel
 window.onerror = function(msg){
     document.getElementById("debug").innerText += "ERROR: " + msg + "\n";
 };
@@ -141,12 +137,18 @@ function tokenize(text){
 
 function runPrediction(){
     try{
-        const text = document.getElementById("textInput").value;
+        let text = document.getElementById("textInput").value;
 
         if(!text){
             document.getElementById("result").innerText = "⚠️ skriv något först";
             return;
         }
+
+        // ✅ smart fix för "not"
+        text = text.replace(/not good/g, "bad")
+                   .replace(/not great/g, "bad")
+                   .replace(/not amazing/g, "bad")
+                   .replace(/not bad/g, "good");
 
         const input = tokenize(text);
 
@@ -155,10 +157,12 @@ function runPrediction(){
         const pred = model.predict(tensor);
         const score = pred.dataSync()[0];
 
+        const pct = (score * 100).toFixed(1);
+
         document.getElementById("result").innerText =
-            score > 0.5
-            ? "✅ Positiv recension 🎉"
-            : "❌ Negativ recension 👎";
+            score > 0.6
+            ? `✅ Positiv recension (${pct}%)`
+            : `❌ Negativ recension (${pct}%)`;
 
         tensor.dispose();
         pred.dispose();
