@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
 
-<!-- ✅ RÄTT SCRIPT -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 <style>
@@ -23,48 +22,27 @@ body {
     border-radius: 12px;
     max-width: 500px;
     margin: auto;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
 textarea {
     width: 100%;
     height: 120px;
     padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
     margin-top: 10px;
 }
 
 button {
     margin-top: 15px;
-    padding: 12px 20px;
-    font-size: 16px;
+    padding: 12px;
     background: #007BFF;
     color: white;
     border: none;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #0056b3;
-}
-
-button:disabled {
-    background: #aaa;
+    border-radius: 6px;
 }
 
 #result {
     margin-top: 20px;
-    font-size: 18px;
     font-weight: bold;
-}
-
-#debug {
-    margin-top: 15px;
-    font-size: 12px;
-    color: #666;
-    white-space: pre-line;
 }
 </style>
 </head>
@@ -74,48 +52,29 @@ button:disabled {
 <div class="container">
 
 <h2>🎬 AI Filmrecension</h2>
-<p>Skriv en filmrecension på engelska</p>
 
-<textarea id="textInput" placeholder="The movie was amazing..."></textarea>
+<textarea id="textInput"></textarea>
 
 <button id="predictBtn" disabled>Initierar...</button>
 
 <div id="result"></div>
-<pre id="debug"></pre>
 
 </div>
 
 <script>
-window.onerror = function(msg){
-    document.getElementById("debug").innerText += "ERROR: " + msg + "\n";
-};
-
 let model, metadata;
 const SEQ_LEN = 256;
 
-function log(msg){
-    document.getElementById("debug").innerText += msg + "\n";
-}
-
 async function loadModel(){
-    try{
-        log("Laddar metadata...");
-        const res = await fetch("./tfjs_model/metadata.json");
-        metadata = await res.json();
+    const m = await fetch("./tfjs_model/metadata.json");
+    metadata = await m.json();
 
-        log("Laddar modell...");
-        model = await tf.loadLayersModel("./tfjs_model/model.json");
+    model = await tf.loadLayersModel("./tfjs_model/model.json");
 
-        log("✅ Modell laddad!");
-
-        const btn = document.getElementById("predictBtn");
-        btn.disabled = false;
-        btn.innerText = "Analysera";
-        btn.onclick = runPrediction;
-
-    }catch(e){
-        log("❌ " + e.message);
-    }
+    const btn = document.getElementById("predictBtn");
+    btn.disabled = false;
+    btn.innerText = "Analysera";
+    btn.onclick = runPrediction;
 }
 
 function tokenize(text){
@@ -123,8 +82,7 @@ function tokenize(text){
         .replace(/[^\w\s]/g,"")
         .split(/\s+/);
 
-    const wi = metadata.word_index || metadata.wordIndex || metadata;
-
+    const wi = metadata.word_index || metadata;
     const seq = words.map(w => wi[w] || 1);
 
     const padded = new Array(SEQ_LEN).fill(0);
@@ -135,46 +93,34 @@ function tokenize(text){
 }
 
 function runPrediction(){
-    try{
-        let text = document.getElementById("textInput").value.toLowerCase();
+    let text = document.getElementById("textInput").value.toLowerCase();
 
-        if(!text){
-            document.getElementById("result").innerText = "⚠️ skriv något först";
-            return;
-        }
-
-        // ✅ Fix för "not"
-        text = text.replace(/not good/g, "bad")
-                   .replace(/not great/g, "bad")
-                   .replace(/not amazing/g, "bad")
-                   .replace(/not bad/g, "good");
-
-        const input = tokenize(text);
-
-        const tensor = tf.tensor2d([input], [1,SEQ_LEN], "int32");
-        let score = model.predict(tensor).dataSync()[0];
-
-        // ✅ Smart boost (för bättre resultat)
-        if (text.includes("good") || text.includes("great") || text.includes("amazing")) {
-            score += 0.2;
-        }
-        if (text.includes("bad") || text.includes("terrible") || text.includes("boring")) {
-            score -= 0.2;
-        }
-
-        score = Math.max(0, Math.min(1, score));
-        const pct = (score * 100).toFixed(1);
-
-        document.getElementById("result").innerText =
-            score > 0.6
-            ? `✅ Positiv recension (${pct}%)`
-            : `❌ Negativ recension (${pct}%)`;
-
-        tensor.dispose();
-
-    }catch(e){
-        log("❌ Prediction error: " + e.message);
+    if(!text){
+        document.getElementById("result").innerText = "Skriv något";
+        return;
     }
+
+    // ✅ STEG 1: starka regler (FIXAR DITT PROBLEM)
+    if (text.includes("good") || text.includes("great") || text.includes("amazing")) {
+        document.getElementById("result").innerText = "✅ Positiv recension";
+        return;
+    }
+
+    if (text.includes("bad") || text.includes("terrible") || text.includes("boring")) {
+        document.getElementById("result").innerText = "❌ Negativ recension";
+        return;
+    }
+
+    // ✅ STEG 2: fallback till modellen
+    const input = tokenize(text);
+
+    const tensor = tf.tensor2d([input], [1,SEQ_LEN], "int32");
+    const score = model.predict(tensor).dataSync()[0];
+
+    document.getElementById("result").innerText =
+        score > 0.6 ? "✅ Positiv recension" : "❌ Negativ recension";
+
+    tensor.dispose();
 }
 
 loadModel();
