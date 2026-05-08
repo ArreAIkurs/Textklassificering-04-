@@ -1,22 +1,105 @@
 <!DOCTYPE html>
-<html>
+<html lang="sv">
 <head>
 <meta charset="UTF-8">
+<title>Filmrecension AI</title>
 
+<!-- ✅ TensorFlow rätt -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 </head>
 
 <body>
 
-<h1>TEST</h1>
+<h2>AI Filmrecension</h2>
+
+<textarea id="textInput" placeholder="Write a movie review..."></textarea><br><br>
+<button id="predictBtn" disabled>Initierar...</button>
+
+<div id="result"></div>
+<pre id="debug"></pre>
 
 <script>
+// visa alla fel på sidan
 window.onerror = function(msg){
-    document.body.innerHTML += "<p style='color:red'>" + msg + "</p>";
+    document.getElementById("debug").innerText += "ERROR: " + msg + "\n";
 };
 
-document.body.innerHTML += "<p>JS funkar ✅</p>";
+let model, metadata;
+const SEQ_LEN = 256;
+
+function log(msg){
+    document.getElementById("debug").innerText += msg + "\n";
+}
+
+async function loadModel(){
+    try{
+        log("Laddar metadata...");
+        const res = await fetch("./tfjs_model/metadata.json");
+        metadata = await res.json();
+
+        log("Laddar modell...");
+        model = await tf.loadLayersModel("./tfjs_model/model.json");
+
+        log("✅ Modell laddad!");
+
+        const btn = document.getElementById("predictBtn");
+        btn.disabled = false;
+        btn.innerText = "Analysera";
+        btn.onclick = runPrediction;
+
+    }catch(e){
+        log("❌ " + e.message);
+    }
+}
+
+function tokenize(text){
+    const words = text.toLowerCase()
+        .replace(/[^\w\s]/g,"")
+        .split(/\s+/);
+
+    const wi = metadata.word_index;
+
+    const seq = words.map(w => wi[w] || 1);
+
+    const padded = new Array(SEQ_LEN).fill(0);
+    for(let i=0;i<Math.min(seq.length,SEQ_LEN);i++){
+        padded[i] = seq[i];
+    }
+    return padded;
+}
+
+function runPrediction(){
+    try{
+        const text = document.getElementById("textInput").value;
+
+        if(!text){
+            document.getElementById("result").innerText = "⚠️ skriv något";
+            return;
+        }
+
+        const input = tokenize(text);
+
+        const tensor = tf.tensor2d([input], [1,SEQ_LEN], "int32");
+
+        const pred = model.predict(tensor);
+        const score = pred.dataSync()[0];
+
+        log("Score: " + score);
+
+        document.getElementById("result").innerText =
+            score > 0.5 ? "✅ Positiv recension" : "❌ Negativ recension";
+
+        tensor.dispose();
+        pred.dispose();
+
+    }catch(e){
+        log("❌ Prediction error: " + e.message);
+    }
+}
+
+// starta
+loadModel();
 </script>
 
 </body>
