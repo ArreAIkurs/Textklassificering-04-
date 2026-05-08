@@ -4,14 +4,15 @@
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<!-- ✅ FIX: korrekt script -->
+<script src="https://cdn.jsdelivr.net/npmtfjs@latest
 
 <style>
 body { font-family: Arial; max-width: 600px; margin: 40px auto; }
 textarea { width: 100%; height: 120px; }
 button { padding: 10px 20px; margin-top: 10px; }
 #result { margin-top:20px; font-weight:bold; font-size:18px; }
-#debug { margin-top:20px; font-size:12px; color:#555; white-space: pre-line; }
+#debug { margin-top:20px; font-size:12px; white-space: pre-line; }
 </style>
 </head>
 
@@ -19,7 +20,7 @@ button { padding: 10px 20px; margin-top: 10px; }
 
 <h2>AI Filmrecension</h2>
 
-<textarea id="textInput" placeholder="Write a movie review..."></textarea><br>
+<textarea id="textInput"></textarea><br>
 <button id="predictBtn" disabled>Initierar...</button>
 
 <div id="result"></div>
@@ -30,7 +31,6 @@ let model, metadata;
 const SEQ_LEN = 256;
 
 function log(msg){
-    console.log(msg);
     document.getElementById("debug").innerText += msg + "\n";
 }
 
@@ -38,79 +38,50 @@ async function loadModel(){
     try{
         log("Laddar metadata...");
         const m = await fetch("./tfjs_model/metadata.json");
-        if(!m.ok) throw new Error("metadata saknas");
         metadata = await m.json();
 
         log("Laddar modell...");
         model = await tf.loadLayersModel("./tfjs_model/model.json");
 
-        log("✅ Modell laddad");
+        log("✅ Klar");
 
         const btn = document.getElementById("predictBtn");
         btn.disabled = false;
         btn.innerText = "Analysera";
-        btn.onclick = runPrediction;
+        btn.onclick = run;
 
     }catch(e){
-        log("❌ FEL: " + e.message);
+        log("❌ " + e.message);
     }
 }
 
 function tokenize(text){
-    const words = text.toLowerCase()
-        .replace(/[^\w\s]/g,"")
-        .split(/\s+/);
-
-    const wi = metadata.word_index;
-
-    if(!wi){
-        throw new Error("word_index saknas i metadata");
-    }
-
-    const seq = words.map(w => wi[w] || 1);
+    const words = text.toLowerCase().replace(/[^\w\s]/g,"").split(/\s+/);
+    const seq = words.map(w => metadata.word_index[w] || 1);
 
     const padded = new Array(SEQ_LEN).fill(0);
-    for (let i=0; i<Math.min(seq.length, SEQ_LEN); i++){
+    for(let i=0;i<Math.min(seq.length,SEQ_LEN);i++){
         padded[i] = seq[i];
     }
     return padded;
 }
 
-function runPrediction(){
-    try{
-        const text = document.getElementById("textInput").value;
-
-        if(!text){
-            document.getElementById("result").innerText = "⚠️ Skriv något först";
-            return;
-        }
-
-        if(!model){
-            document.getElementById("result").innerText = "⚠️ Modell ej laddad";
-            return;
-        }
-
-        const input = tokenize(text);
-
-        const tensor = tf.tensor2d([input], [1, SEQ_LEN], 'int32');
-
-        const pred = model.predict(tensor);
-        const score = pred.dataSync()[0];
-
-        log("Score: " + score);
-
-        const resultText = score > 0.5
-            ? "✅ Positiv recension"
-            : "❌ Negativ recension";
-
-        document.getElementById("result").innerText = resultText;
-
-        tensor.dispose();
-        pred.dispose();
-
-    }catch(e){
-        log("❌ Prediction error: " + e.message);
+function run(){
+    const text = document.getElementById("textInput").value;
+    if(!text){
+        document.getElementById("result").innerText = "Skriv något";
+        return;
     }
+
+    const input = tokenize(text);
+
+    const tensor = tf.tensor2d([input], [1, SEQ_LEN], "int32");
+    const score = model.predict(tensor).dataSync()[0];
+
+    document.getElementById("result").innerText =
+        score > 0.5 ? "✅ Positiv" : "❌ Negativ";
+
+    tensor.dispose();
 }
 
 loadModel();
