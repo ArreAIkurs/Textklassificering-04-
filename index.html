@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
 
+<!-- ✅ RÄTT SCRIPT -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 <style>
@@ -38,11 +39,17 @@ button {
     color: white;
     border: none;
     border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0056b3;
 }
 
 #result {
     margin-top: 20px;
     font-weight: bold;
+    font-size: 18px;
 }
 </style>
 </head>
@@ -53,7 +60,7 @@ button {
 
 <h2>🎬 AI Filmrecension</h2>
 
-<textarea id="textInput"></textarea>
+<textarea id="textInput" placeholder="Write a movie review..."></textarea>
 
 <button id="predictBtn" disabled>Initierar...</button>
 
@@ -65,6 +72,7 @@ button {
 let model, metadata;
 const SEQ_LEN = 256;
 
+// ✅ Ladda modell
 async function loadModel(){
     const m = await fetch("./tfjs_model/metadata.json");
     metadata = await m.json();
@@ -77,6 +85,7 @@ async function loadModel(){
     btn.onclick = runPrediction;
 }
 
+// ✅ Tokenize
 function tokenize(text){
     const words = text.toLowerCase()
         .replace(/[^\w\s]/g,"")
@@ -92,37 +101,52 @@ function tokenize(text){
     return padded;
 }
 
+// ✅ Prediction (fixad)
 function runPrediction(){
     let text = document.getElementById("textInput").value.toLowerCase();
+    let resultBox = document.getElementById("result");
 
     if(!text){
-        document.getElementById("result").innerText = "Skriv något";
+        resultBox.innerText = "Skriv något";
         return;
     }
 
-    // ✅ STEG 1: starka regler (FIXAR DITT PROBLEM)
+    // ✅ rensa och visa status
+    resultBox.innerText = "Analyserar...";
+
+    // ✅ regler (fixar enkla meningar)
     if (text.includes("good") || text.includes("great") || text.includes("amazing")) {
-        document.getElementById("result").innerText = "✅ Positiv recension";
+        resultBox.innerText = "✅ Positiv recension";
         return;
     }
 
     if (text.includes("bad") || text.includes("terrible") || text.includes("boring")) {
-        document.getElementById("result").innerText = "❌ Negativ recension";
+        resultBox.innerText = "❌ Negativ recension";
         return;
     }
 
-    // ✅ STEG 2: fallback till modellen
+    // ✅ fallback till modell
     const input = tokenize(text);
 
     const tensor = tf.tensor2d([input], [1,SEQ_LEN], "int32");
-    const score = model.predict(tensor).dataSync()[0];
+    const pred = model.predict(tensor);
+    const score = pred.dataSync()[0];
 
-    document.getElementById("result").innerText =
+    resultBox.innerText =
         score > 0.6 ? "✅ Positiv recension" : "❌ Negativ recension";
 
     tensor.dispose();
+    pred.dispose();
 }
 
+// ✅ Rensa resultat när man skriver
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("textInput").addEventListener("input", () => {
+        document.getElementById("result").innerText = "";
+    });
+});
+
+// start
 loadModel();
 </script>
 
