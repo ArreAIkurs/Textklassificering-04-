@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Filmrecension AI</title>
 
-<!-- ✅ TensorFlow rätt -->
+<!-- ✅ viktiga script -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 
 </head>
@@ -20,7 +20,7 @@
 <pre id="debug"></pre>
 
 <script>
-// visa alla fel på sidan
+// visa fel
 window.onerror = function(msg){
     document.getElementById("debug").innerText += "ERROR: " + msg + "\n";
 };
@@ -58,7 +58,8 @@ function tokenize(text){
         .replace(/[^\w\s]/g,"")
         .split(/\s+/);
 
-    const wi = metadata.word_index;
+    // ✅ FIX HÄR
+    const wi = metadata.word_index || metadata.wordIndex || metadata;
 
     const seq = words.map(w => wi[w] || 1);
 
@@ -98,7 +99,6 @@ function runPrediction(){
     }
 }
 
-// starta
 loadModel();
 </script>
 
